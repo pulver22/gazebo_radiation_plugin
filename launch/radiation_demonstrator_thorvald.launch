@@ -1,0 +1,97 @@
+<launch>
+  <arg name="use_sim_time" default="true" />
+  <arg name="gui" default="true" />
+  <arg name="headless" default="false" />
+  <arg name="world_name" default="$(find gazebo_radiation_plugins)/custom_models/reactor_room/updated_reactor_room2.world" />
+  <!-- <arg name="world_name" value="$(find nbs_experiments)/worlds/empty.world"/> -->
+  <arg name="loc_map_yaml"   default="$(find gazebo_radiation_plugins)/maps/reactor.yaml"/>
+  <arg name="nav_map_yaml"   default="$(find gazebo_radiation_plugins)/maps/reactor.yaml"/>
+  <arg name="map_2_loc_map_pose"   default="0.0 0.0 0.0 0.0 0.0 0.0 1.0"/>
+  <arg name="use_fake_localization" default="true"/>
+
+  <param name="use_sim_time" value="$(arg use_sim_time)"/>
+
+  <!-- Short-term hack to support the original front_laser:=true argument for spawning
+       the simulator. This will be removed in favour of using the config:=x arg instead. -->
+  <arg name="front_laser" default="true" />
+  <arg name="default_config" value="front_laser" if="$(arg front_laser)" />
+  <arg name="default_config" value="base" unless="$(arg front_laser)" /> 
+  <!-- end of hack -->
+
+  <!--Load params -->
+  <rosparam file="$(find gazebo_radiation_plugins)/custom_models/reactor_room/configs/attentuation.yaml" command="load"  />
+  <rosparam file="$(find gazebo_radiation_plugins)/custom_models/reactor_room/configs/sensors.yaml" command="load"  />
+  <rosparam file="$(find gazebo_radiation_plugins)/custom_models/reactor_room/configs/radiation.yaml" command="load"  />
+
+  <!-- Launch Gazebo with the specified world -->
+
+  <node name="gazebo" pkg="gazebo_radiation_plugins" type="gazebo"  output="screen"
+  args="--verbose $(arg world_name)" />
+
+  <!-- Configuration of Jackal which you would like to simulate.
+       See jackal_description for details. -->
+       <arg name="config" default="$(arg default_config)" />
+
+  <!-- Load Jackal's description, controllers, and teleop nodes. -->
+  <include file="$(find gazebo_radiation_plugins)/launch/custom_description.launch">
+    <arg name="config" value="$(arg config)" />
+  </include>
+  <include file="$(find jackal_control)/launch/control.launch" />
+  <include file="$(find jackal_control)/launch/teleop.launch">
+    <arg name="joystick" value="false"/>
+  </include>
+
+  <!-- Spawn Jackal -->
+  <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" output="screen"
+	      args="-urdf -model jackal -param robot_description -x -0 -y 0 -z 0.0" />
+
+  <!-- Attach sensor to Jackal -->
+  <node pkg="tf" type="static_transform_publisher" name="sim_sensor_to_robot" args="0 0 0 0 0 0 base_link sim_sensor 100"/>
+
+  <!-- .......................... Localization ........................... -->
+  <node name="loc_map_server" pkg="map_server" type="map_server" args="$(arg loc_map_yaml)"  output="screen">
+    <!-- <remap from="map" to ="loc_map"/> -->
+    <!-- <param name="frame_id" value="loc_map"/> -->
+  </node>
+
+  <node pkg="fake_localization" type="fake_localization" respawn="false" name="fake_loc">
+    <remap from="base_pose_ground_truth" to="/jackal_velocity_controller/odom" />
+    <param name="odom_frame_id" type="string" value="odom"/>
+    <param name="base_frame_id" type="string" value="base_link"/>
+  </node>
+
+  <!-- ............................ Navigation ........................... -->
+  <!-- <node name="nav_map_server" pkg="map_server" type="map_server" args="$(arg nav_map_yaml)"  output="screen">
+  </node> -->
+
+  <node pkg="tf" type="static_transform_publisher" name="map_2_loc_map_tfb"
+      args="$(arg map_2_loc_map_pose) map loc_map 1000"/> 
+
+  <!-- ............................ TopoNavigation ........................... -->
+  <!-- publish \robot_pose for topological navigation utils -->
+  <node name="robot_pose_publisher" pkg="robot_pose_publisher" type="robot_pose_publisher" output="screen"/>
+
+  <include file="$(find mongodb_store)/launch/mongodb_store.launch">
+    <arg name="db_path" value="/home/pulver/mongodb"/>
+  </include>
+
+  <include file="$(find topological_navigation)/launch/topological_navigation.launch">
+    <arg name="map" value="reactor_new"/>
+    <arg name="move_base_reconf_service" default="TrajectoryPlannerROS" />
+  	<arg name="move_base_planner" default="move_base/TrajectoryPlannerROS" />
+  </include>
+
+  <!-- Planning -->
+  <!-- <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen"> -->
+    <!-- <remap from="cmd_vel" to="$(arg cmd_vel)"/> -->
+  <!-- </node> -->
+
+  <!-- Run Move Base -->
+  <include file="$(find gazebo_radiation_plugins)/launch/move_base.launch" />
+
+  <!-- <include file="$(find gazebo_radiation_plugins)/launch/radmap.launch" /> -->
+
+  <!-- Run RVIZ -->
+  <node name="rviz" pkg="rviz" type="rviz"  args="-d $(find gazebo_radiation_plugins)launch/rviz_config/husky_radiation_mapping.rviz"/>
+
+</launch>
