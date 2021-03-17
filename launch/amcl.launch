@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="amcl_cfg"        default="$(find gazebo_radiation_plugins)/configs/amcl_jackal.yaml"/>
+
+<node pkg="amcl" type="amcl" name="amcl" output="screen">
+      <remap from="map" to="loc_map"/>
+      <remap from="/scan" to="/front/scan"/>
+      <!-- <rosparam file="$(env HOME)/.ros/pose.yaml" command="load"/> -->
+      <rosparam file="$(arg amcl_cfg)" command="load"/>
+      <rosparam param="global_frame_id" subst_value="True">loc_map</rosparam>
+      <rosparam param="gui_publish_rate" subst_value="True">30</rosparam>
+      <param name="use_map_topic" value="true"/>
+      <param name="first_map_only" value="true"/>
+  </node>
+
+
+</launch>

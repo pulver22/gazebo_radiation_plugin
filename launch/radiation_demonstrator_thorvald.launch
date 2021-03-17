@@ -3,12 +3,12 @@
   <arg name="gui" default="true" />
   <arg name="headless" default="false" />
   <arg name="world_name" default="$(find gazebo_radiation_plugins)/custom_models/reactor_room/updated_reactor_room2.world" />
-  <!-- <arg name="world_name" value="$(find nbs_experiments)/worlds/empty.world"/> -->
-  <arg name="loc_map_yaml"   default="$(find gazebo_radiation_plugins)/maps/reactor.yaml"/>
-  <arg name="nav_map_yaml"   default="$(find gazebo_radiation_plugins)/maps/reactor.yaml"/>
+  <arg name="loc_map_yaml"   default="$(find gazebo_radiation_plugins)/maps/reactor_2.yaml"/>
+  <arg name="nav_map_yaml"   default="$(find gazebo_radiation_plugins)/maps/reactor_2.yaml"/>
   <arg name="map_2_loc_map_pose"   default="0.0 0.0 0.0 0.0 0.0 0.0 1.0"/>
-  <arg name="use_fake_localization" default="true"/>
-
+  <arg name="amcl_cfg"        default="$(find gazebo_radiation_plugins)/configs/amcl_jackal.yaml"/>
+  <!-- <arg name="use_fake_localization" default="true"/> -->
+  
   <param name="use_sim_time" value="$(arg use_sim_time)"/>
 
   <!-- Short-term hack to support the original front_laser:=true argument for spawning
@@ -23,14 +23,15 @@
   <rosparam file="$(find gazebo_radiation_plugins)/custom_models/reactor_room/configs/sensors.yaml" command="load"  />
   <rosparam file="$(find gazebo_radiation_plugins)/custom_models/reactor_room/configs/radiation.yaml" command="load"  />
 
-  <!-- Launch Gazebo with the specified world -->
+  <!-- ................................. Gazebo ......................................... -->
 
   <node name="gazebo" pkg="gazebo_radiation_plugins" type="gazebo"  output="screen"
   args="--verbose $(arg world_name)" />
 
+  <!-- .................................. Robot ......................................... -->
   <!-- Configuration of Jackal which you would like to simulate.
        See jackal_description for details. -->
-       <arg name="config" default="$(arg default_config)" />
+  <arg name="config" default="$(arg default_config)" />
 
   <!-- Load Jackal's description, controllers, and teleop nodes. -->
   <include file="$(find gazebo_radiation_plugins)/launch/custom_description.launch">
@@ -50,22 +51,34 @@
 
   <!-- .......................... Localization ........................... -->
   <node name="loc_map_server" pkg="map_server" type="map_server" args="$(arg loc_map_yaml)"  output="screen">
-    <!-- <remap from="map" to ="loc_map"/> -->
-    <!-- <param name="frame_id" value="loc_map"/> -->
+    <remap from="map" to ="loc_map"/>
+    <param name="frame_id" value="loc_map"/>
   </node>
 
-  <node pkg="fake_localization" type="fake_localization" respawn="false" name="fake_loc">
+  <node pkg="tf" type="static_transform_publisher" name="map_2_loc_map_tfb"
+    args="$(arg map_2_loc_map_pose) map loc_map 1000"/> 
+
+  <include file="$(find gazebo_radiation_plugins)/launch/amcl.launch">
+      <arg name="amcl_cfg"         value="$(arg amcl_cfg)"/>
+  </include>
+
+  <!-- TODO: not working -->
+  <!-- <node pkg="fake_localization" type="fake_localization" respawn="false" name="fake_loc">
     <remap from="base_pose_ground_truth" to="/jackal_velocity_controller/odom" />
     <param name="odom_frame_id" type="string" value="odom"/>
     <param name="base_frame_id" type="string" value="base_link"/>
-  </node>
-
-  <!-- ............................ Navigation ........................... -->
-  <!-- <node name="nav_map_server" pkg="map_server" type="map_server" args="$(arg nav_map_yaml)"  output="screen">
+    <param name="global_frame_id" type="string" value="loc_map"/>
   </node> -->
 
-  <node pkg="tf" type="static_transform_publisher" name="map_2_loc_map_tfb"
-      args="$(arg map_2_loc_map_pose) map loc_map 1000"/> 
+  <!-- ............................ Navigation ........................... -->
+  <node name="nav_map_server" pkg="map_server" type="map_server" args="$(arg nav_map_yaml)"  output="screen">
+  </node>
+
+  <!-- <node pkg="tf" type="static_transform_publisher" name="map_2_loc_map_tfb"
+      args="$(arg map_2_loc_map_pose) map loc_map 1000"/>  -->
+
+  <!-- Run Move Base -->
+  <include file="$(find gazebo_radiation_plugins)/launch/move_base.launch" />
 
   <!-- ............................ TopoNavigation ........................... -->
   <!-- publish \robot_pose for topological navigation utils -->
@@ -80,18 +93,12 @@
     <arg name="move_base_reconf_service" default="TrajectoryPlannerROS" />
   	<arg name="move_base_planner" default="move_base/TrajectoryPlannerROS" />
   </include>
+  
+  <!-- .......................... Radiation Mapping ............................ -->
 
-  <!-- Planning -->
-  <!-- <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen"> -->
-    <!-- <remap from="cmd_vel" to="$(arg cmd_vel)"/> -->
-  <!-- </node> -->
+  <include file="$(find gazebo_radiation_plugins)/launch/radmap.launch" />
 
-  <!-- Run Move Base -->
-  <include file="$(find gazebo_radiation_plugins)/launch/move_base.launch" />
-
-  <!-- <include file="$(find gazebo_radiation_plugins)/launch/radmap.launch" /> -->
-
-  <!-- Run RVIZ -->
+  <!-- ............................... RVIZ .................................... -->
   <node name="rviz" pkg="rviz" type="rviz"  args="-d $(find gazebo_radiation_plugins)launch/rviz_config/husky_radiation_mapping.rviz"/>
 
 </launch>
