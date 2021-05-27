@@ -87,12 +87,12 @@
   <include file="$(find mongodb_store)/launch/mongodb_store.launch">
     <arg name="db_path" value="/home/pulver/mongodb"/>
   </include>
-
+<!-- 
   <include file="$(find topological_navigation)/launch/topological_navigation.launch">
     <arg name="map" value="reactor_new"/>
     <arg name="move_base_reconf_service" default="TrajectoryPlannerROS" />
   	<arg name="move_base_planner" default="move_base/TrajectoryPlannerROS" />
-  </include>
+  </include> -->
   
   <!-- .......................... Radiation Mapping ............................ -->
 
