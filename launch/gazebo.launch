@@ -1,0 +1,14 @@
+<launch>
+    <arg name="use_sim_time" default="true" />
+    <arg name="gui" default="true" />
+    <arg name="headless" default="false" />
+    <arg name="debug" default="false" />
+    <arg name="verbose" default="false" />
+    <arg name="world_name" default="$(find ncnr_gazebo)/worlds/riseholme_ncnr.world" />
+
+    <param name="use_sim_time" value="$(arg use_sim_time)" />
+
+    <node name="gazebo" pkg="gazebo_radiation_plugins" type="gazebo" output="screen"
+        args="--verbose $(arg world_name)" />
+
+</launch>
